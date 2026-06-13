@@ -9,7 +9,7 @@ This repository does not train a music model and does not replace REAPER. It giv
 ## What It Does
 
 - Guides Codex to use the configured `reaper` MCP server safely.
-- Encourages `get_project_summary()` before write operations.
+- Encourages `reaper_status()` before write operations.
 - Resolves track names to current track indices before index-based edits.
 - Requires confirmation for deletion, overwrite, render, record, and large batch edits.
 - Maps common music-production feedback to proportional REAPER actions.
@@ -21,21 +21,20 @@ This repository does not train a music model and does not replace REAPER. It giv
 - It does not include Kontakt instruments, samples, presets, or commercial content.
 - It does not directly load `.nki` files inside Kontakt through fragile plugin UI automation.
 - It does not require users to convert an entire instrument library into templates.
-- It does not replace TwelveTake REAPER MCP; it is a workflow layer on top of a REAPER MCP server.
+- It does not replace the REAPER MCP server; it is a workflow layer on top of a configured REAPER MCP server.
 
 ## Requirements
 
 - REAPER.
-- A working REAPER MCP server named `reaper`.
-- Recommended: [TwelveTake-Studios/reaper-mcp](https://github.com/TwelveTake-Studios/reaper-mcp).
+- [REAPER MCP v2](https://github.com/AnqiPinku/reaper-mcp-v2), registered as `reaper`.
 - Codex with skills enabled.
 
-The skill assumes a `reaper` MCP server is available. With TwelveTake REAPER MCP, the usual path is:
+The skill assumes a `reaper` MCP server is available. With [REAPER MCP v2](https://github.com/AnqiPinku/reaper-mcp-v2), the usual path is:
 
 1. Run `reaper_mcp_bridge.lua` inside REAPER.
-2. Configure Codex MCP with the TwelveTake Python server.
-3. Set `REAPER_COMM_MODE=file`.
-4. Set `REAPER_BRIDGE_DIR` to the bridge directory used by the REAPER bridge.
+2. Configure Codex MCP with `server/reaper_mcp_server.py`.
+3. Use an ASCII path for the MCP server command/cwd on Windows when possible.
+4. Keep the default IPC mailbox at `%APPDATA%\reaper-mcp-ipc`, or set `REAPER_MCP_IPC_DIR` on both sides.
 
 ## Install
 
@@ -96,13 +95,12 @@ Expected behavior:
 If the bridge is not responding, run:
 
 ```bash
-python ~/.codex/skills/reaper-producer/scripts/check_reaper_mcp.py --bridge-dir PATH_TO_MCP_BRIDGE_DATA
+python ~/.codex/skills/reaper-producer/scripts/check_reaper_mcp.py
 ```
 
 On Windows PowerShell, for example:
 
 ```powershell
-$env:REAPER_BRIDGE_DIR = "C:\path\to\mcp_bridge_data"
 python -X utf8 "$env:USERPROFILE\.codex\skills\reaper-producer\scripts\check_reaper_mcp.py"
 ```
 
@@ -148,7 +146,7 @@ python skills/reaper-producer/scripts/validate_instrument_registry.py examples/i
 Insert a registered track template into the live REAPER project:
 
 ```bash
-python skills/reaper-producer/scripts/insert_instrument_template.py grand_piano --registry instruments.json --bridge-dir PATH_TO_MCP_BRIDGE_DATA
+python skills/reaper-producer/scripts/insert_instrument_template.py grand_piano --registry instruments.json
 ```
 
 `insert_instrument_template.py` modifies the open REAPER project by inserting a `.RTrackTemplate`. Use it only when REAPER is open and the bridge is running.

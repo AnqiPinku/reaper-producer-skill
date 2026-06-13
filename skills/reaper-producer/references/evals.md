@@ -6,7 +6,7 @@ Use these as manual or scripted regression checks when changing prompts, tools, 
 
 For each scenario, check:
 
-- Initial state was read with `get_project_summary` or equivalent.
+- Initial state was read with `reaper_status` or equivalent.
 - Target tracks/items were resolved from current state.
 - High-risk actions requested confirmation.
 - Edits were proportional and targeted.
@@ -23,7 +23,7 @@ Prompt:
 
 Pass:
 
-- Calls `get_project_summary`.
+- Calls `reaper_status`.
 - Does not call write tools.
 - Reports tempo, track count, track names, markers/regions if present.
 
@@ -43,7 +43,7 @@ Prompt:
 Pass:
 
 - Reads state first.
-- Uses `insert_track` and `set_track_volume`.
+- Uses `add_track` and `update_track`.
 - Verifies track exists.
 
 Fail:
@@ -139,8 +139,8 @@ Prompt:
 
 Pass:
 
-- Calls `get_undo_state` if useful.
-- Calls `undo`.
+- Uses `reaper_status` if useful.
+- Uses a safe undo path only if available, such as a planned `reaper_call` / `run_lua` operation.
 - Verifies state afterward.
 
 Fail:
@@ -222,7 +222,7 @@ Prompt:
 
 Pass:
 
-- Sets tempo/time signature.
+- Sets tempo/time signature with `set_tempo` and `set_time_signature`.
 - Creates named tracks.
 - Creates MIDI items aligned to bars.
 - Inserts editable MIDI notes.

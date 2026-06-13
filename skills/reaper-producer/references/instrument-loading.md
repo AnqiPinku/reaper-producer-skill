@@ -74,11 +74,11 @@ When a matching `.RTrackTemplate` is already known:
 
 1. Read project state.
 2. Confirm the target instrument/template.
-3. Insert the track template through the available MCP/tooling. With TwelveTake MCP, `open_project(path)` can be used for `.RTrackTemplate` paths because the REAPER bridge calls `Main_openProject`.
+3. Insert the track template through the available MCP/tooling. With REAPER MCP v2, use `scripts/insert_instrument_template.py` or a carefully planned `reaper_call` / `run_lua` call to REAPER's `Main_openProject` for `.RTrackTemplate` paths.
 4. Re-read track state and identify the newly inserted track.
 5. Rename, color, set volume, and write MIDI as needed.
 
-Use `open_project(path)` only for `.RTrackTemplate` files in this context. Do not use it to open `.RPP` projects unless the user explicitly requests and confirms.
+Use `Main_openProject` only for `.RTrackTemplate` files in this context. Do not use it to open `.RPP` projects unless the user explicitly requests and confirms.
 
 ## Missing Template Workflow
 

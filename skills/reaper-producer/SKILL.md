@@ -13,9 +13,9 @@ The primary goal is not to create final commercial audio in one pass. The goal i
 
 ## Required Assumptions
 
-- A `reaper` MCP server should be configured, backed by TwelveTake REAPER MCP.
+- A `reaper` MCP server should be configured, backed by the local REAPER MCP v2 server.
 - REAPER must be running and `reaper_mcp_bridge.lua` must be running inside REAPER.
-- The bridge directory should be configured through `REAPER_BRIDGE_DIR`. Prefer ASCII paths on Windows to avoid subprocess path encoding issues.
+- The v2 bridge uses `%APPDATA%\reaper-mcp-ipc` by default. Prefer ASCII paths for the MCP server command/cwd on Windows.
 - If the MCP tools are unavailable, do not invent REAPER state. Ask the user to restart Codex or run the bridge, and use `scripts/check_reaper_mcp.py` for diagnostics.
 
 ## Non-Negotiable Safety Rules
@@ -29,13 +29,13 @@ The primary goal is not to create final commercial audio in one pass. The goal i
 7. Prefer small targeted edits over rebuilding the whole project.
 8. Never delete, overwrite, batch-replace, render long outputs, import external files, or start recording without telling the user the risk and getting confirmation.
 
-Destructive or high-risk tools include `delete_track`, `delete_item`, `delete_selected_items`, `delete_take`, `delete_marker`, `delete_region`, `delete_send`, `track_fx_delete`, `take_fx_delete`, `clear_midi_item`, `clear_envelope`, `clear_fx_envelope`, `cut_selected_items`, `save_project`, `open_project`, `render_project`, `record`, and broad `run_action` / `run_action_by_name`.
+Destructive or high-risk tools include `delete_track`, `render_project`, `transport` with `record`, broad `reaper_call`, any `run_lua` that writes project state, and any call that deletes, clears, overwrites, records, renders, imports files, or opens another project.
 
 ## Default Workflow
 
 For any non-trivial request:
 
-1. **Inspect**: Call `get_project_summary()` first. If it fails or is unavailable, use narrower read-only tools such as `get_all_tracks`, `get_tempo`, `get_time_signature`, `get_markers`, `get_regions`, `get_selected_tracks`, and `get_selected_items`.
+1. **Inspect**: Call `reaper_status()` first. If it fails or is unavailable, use `list_tracks()` and read-only `reaper_call` calls such as `Master_GetTempo`, `CountTracks`, or `GetProjectName`.
 2. **Clarify targets**: Identify track names, track indices, item indices, time range, and musical intent. If a target is ambiguous, ask one concise question or offer a conservative default.
 3. **Plan**: State a short plan before writing. Include the tools to be used and the intended targets.
 4. **Confirm when needed**: Ask explicit confirmation for high-risk actions. Low-risk operations can proceed if the user clearly requested execution.
@@ -47,21 +47,20 @@ For simple read-only questions, just inspect and answer.
 
 ## Tool Strategy
 
-Use `get_project_summary()` as the first context call whenever possible. TwelveTake's own server instructions recommend it because it returns broad project context in one call.
+Use `reaper_status()` as the first context call whenever possible. It returns tempo, play state, project path, track count, and track summaries in one call.
 
 Prefer these stable patterns:
 
-- Project status: `get_project_summary`, `get_project_name`, `get_project_path`, `get_tempo`, `get_time_signature`, `get_project_length`, `get_markers`, `get_regions`.
-- Track lookup: `get_all_tracks` or `get_project_summary`, then index-based operations.
-- Track creation: `insert_track`, then `set_track_name`, `set_track_color`, `set_track_volume`, `set_track_pan`.
-- MIDI creation: `create_midi_item`, then `add_midi_notes_batch` rather than many single `add_midi_note` calls.
-- MIDI edits: `get_midi_item`, `get_midi_notes`, then targeted `set_midi_note_velocity`, `delete_midi_note`, `clear_midi_item` only with confirmation.
-- Audio import/editing: `insert_audio_file`, `set_item_position`, `set_item_length`, `set_item_volume`, `set_item_fade_in`, `set_item_fade_out`.
-- FX: `track_fx_get_list`, `track_fx_add_by_name`, `track_fx_get_num_params`, `track_fx_get_param_name`, `track_fx_set_param`, `track_fx_set_enabled`.
-- Routing: `create_bus`, `create_send`, `set_send_volume`, `setup_sidechain_send`, `setup_sidechain_compression`.
-- Mixing helpers: `add_eq`, `add_compressor`, `add_limiter`, `add_parallel_compression`, `add_mastering_chain`.
-- Transport: `play`, `stop`, `pause`, `set_cursor_position`, `set_time_selection`, `toggle_repeat`.
-- Recovery: `get_undo_state`, `undo`, `redo`.
+- Project status: `reaper_status`, `list_tracks`, and read-only `reaper_call` for missing project details.
+- Track lookup: `reaper_status` or `list_tracks`, then index-based operations.
+- Track creation/editing: `add_track`, then `update_track` for name, volume, pan, mute, solo, or color.
+- MIDI creation: `create_midi_item`, then `add_midi_notes` with beat-based timing.
+- MIDI edits: `get_midi_notes`, then targeted edits through available tools or carefully planned `run_lua`; ask confirmation before clearing/replacing an item.
+- FX: `list_track_fx`, `add_track_fx`, `get_fx_params`, and `set_fx_param`.
+- Project setup: `set_tempo`, `set_time_signature`, `set_time_selection`, and `add_marker`.
+- Transport: `transport` with `play`, `stop`, `pause`, `toggle_repeat`, or `goto_start`. Treat `record` as high risk.
+- Rendering: `render_project` only after confirming output and overwrite risk.
+- Escape hatches: use `reaper_call` for one REAPER API call when no high-level tool exists; use `run_lua` only with a short plan and confirmation for state-changing code.
 
 Read `references/tool-map.md` when tool choice matters or when composing a multi-step workflow.
 
@@ -102,7 +101,7 @@ Ask confirmation for:
 
 - Deleting tracks/items/FX/regions/markers.
 - Clearing MIDI items or envelopes.
-- Running broad `run_action` commands.
+- Running broad `reaper_call` or any state-changing `run_lua`.
 - Saving over an existing project.
 - Opening a different project.
 - Rendering to a path that may overwrite a file.
@@ -136,7 +135,7 @@ If an MCP tool returns a timeout or bridge error:
 
 If a tool returns an unexpected schema or missing object:
 
-1. Re-read project summary.
+1. Re-read project state with `reaper_status` or `list_tracks`.
 2. Re-resolve names to indices.
 3. If the target still cannot be found, stop and ask for target clarification.
 
@@ -152,11 +151,11 @@ Use `references/evals.md` when testing whether the workflow behaves well. For a 
 
 ## Bundled Resources
 
-- `scripts/check_reaper_mcp.py`: Standard-library health check for the file bridge. Run it when bridge connectivity is uncertain.
+- `scripts/check_reaper_mcp.py`: Standard-library health check for the v2 file bridge. Run it when bridge connectivity is uncertain.
 - `scripts/scan_reaper_templates.py`: Generate a starter instrument registry from `.RTrackTemplate` files.
 - `scripts/validate_instrument_registry.py`: Validate an instrument registry before using it.
-- `scripts/insert_instrument_template.py`: Insert a registered `.RTrackTemplate` through the file bridge when explicitly requested.
-- `references/tool-map.md`: Preferred TwelveTake REAPER MCP tools, safer substitutions, and risky tools.
+- `scripts/insert_instrument_template.py`: Insert a registered `.RTrackTemplate` through the v2 file bridge when explicitly requested.
+- `references/tool-map.md`: Preferred REAPER MCP v2 tools, safer substitutions, and risky tools.
 - `references/production-semantics.md`: Music-production phrase mapping, including common Chinese feedback.
 - `references/instrument-loading.md`: On-demand instrument template workflow for Kontakt, samplers, and VSTi libraries.
 - `references/evals.md`: Manual/agent eval scenarios and pass criteria.

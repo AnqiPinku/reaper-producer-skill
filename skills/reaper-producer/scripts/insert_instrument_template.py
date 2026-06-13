@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Insert a registered REAPER track template through the TwelveTake file bridge."""
+"""Insert a registered REAPER track template through the REAPER MCP v2 file bridge."""
 
 from __future__ import annotations
 
@@ -8,27 +8,24 @@ import json
 import os
 import sys
 import time
+import uuid
 from pathlib import Path
 
 
-def default_bridge_dir() -> str:
-    env_value = os.environ.get("REAPER_BRIDGE_DIR")
+def default_ipc_dir() -> str:
+    env_value = os.environ.get("REAPER_MCP_IPC_DIR")
     if env_value:
         return env_value
-    candidates = []
+
     appdata = os.environ.get("APPDATA")
     if appdata:
-        candidates.append(str(Path(appdata) / "REAPER" / "Scripts" / "mcp_bridge_data"))
-    candidates.extend(
-        [
-            os.path.expanduser(r"~/Library/Application Support/REAPER/Scripts/mcp_bridge_data"),
-            os.path.expanduser(r"~/.config/REAPER/Scripts/mcp_bridge_data"),
-        ]
-    )
-    for candidate in candidates:
-        if candidate and Path(candidate).exists():
-            return candidate
-    return candidates[0] if candidates else "mcp_bridge_data"
+        return str(Path(appdata) / "reaper-mcp-ipc")
+
+    xdg = os.environ.get("XDG_DATA_HOME")
+    if xdg:
+        return str(Path(xdg) / "reaper-mcp-ipc")
+
+    return str(Path.home() / ".local" / "share" / "reaper-mcp-ipc")
 
 
 def expand_path(value: str, variables: dict[str, str]) -> Path:
@@ -49,31 +46,37 @@ def find_instrument(registry: dict, instrument_id: str) -> dict | None:
     return None
 
 
-def call_bridge(bridge_dir: Path, func: str, args: list, timeout: float) -> dict:
-    bridge_dir.mkdir(parents=True, exist_ok=True)
-    slot = (int(time.time() * 1000) + os.getpid()) % 999 + 1
-    for offset in range(999):
-        candidate = (slot + offset - 1) % 999 + 1
-        request_file = bridge_dir / f"request_{candidate}.json"
-        response_file = bridge_dir / f"response_{candidate}.json"
-        if not request_file.exists() and not response_file.exists():
-            break
-    else:
-        return {"ok": False, "error": "no_free_request_slot"}
-
+def call_bridge(ipc_dir: Path, func: str, args: list, timeout: float) -> dict:
+    ipc_dir.mkdir(parents=True, exist_ok=True)
+    request_file = ipc_dir / "request.json"
+    response_file = ipc_dir / "response.json"
+    tmp_file = ipc_dir / "request.tmp"
+    request_id = uuid.uuid4().hex[:12]
     response_file.unlink(missing_ok=True)
-    request_file.write_text(json.dumps({"func": func, "args": args}), encoding="utf-8")
+    payload = {"id": request_id, "func": func, "args": args}
+    tmp_file.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    tmp_file.replace(request_file)
+
     try:
         deadline = time.time() + timeout
         while time.time() < deadline:
             if response_file.exists():
                 text = response_file.read_text(encoding="utf-8").strip()
                 if text:
-                    return json.loads(text)
+                    result = json.loads(text)
+                    if result.get("id") != request_id:
+                        return {
+                            "ok": False,
+                            "error": "response_id_mismatch",
+                            "expected": request_id,
+                            "actual": result.get("id"),
+                        }
+                    return result
             time.sleep(0.05)
         return {"ok": False, "error": "timeout"}
     finally:
         request_file.unlink(missing_ok=True)
+        tmp_file.unlink(missing_ok=True)
         response_file.unlink(missing_ok=True)
 
 
@@ -81,7 +84,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Insert a registered REAPER instrument track template.")
     parser.add_argument("instrument", help="Instrument id or alias from the registry.")
     parser.add_argument("--registry", default="instruments.json", help="Instrument registry path.")
-    parser.add_argument("--bridge-dir", default=default_bridge_dir(), help="TwelveTake file bridge directory.")
+    parser.add_argument("--ipc-dir", default=None, help="REAPER MCP v2 IPC directory.")
+    parser.add_argument("--bridge-dir", default=None, help="Deprecated alias for --ipc-dir.")
     parser.add_argument("--timeout", type=float, default=10.0)
     parser.add_argument(
         "--var",
@@ -118,7 +122,8 @@ def main() -> int:
         print(f"Track template not found: {template_path}", file=sys.stderr)
         return 1
 
-    result = call_bridge(Path(args.bridge_dir), "Main_openProject", [str(template_path)], args.timeout)
+    ipc_dir = Path(args.ipc_dir or args.bridge_dir or default_ipc_dir())
+    result = call_bridge(ipc_dir, "Main_openProject", [str(template_path)], args.timeout)
     print(json.dumps(result, indent=2, ensure_ascii=False))
     return 0 if result.get("ok") else 1
 

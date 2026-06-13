@@ -112,6 +112,8 @@ jobs:
               "A:" + r"\REDACTED",
               "REDACTED" + " Library 2",
               "A:" + r"\REDACTED",
+              "REDACTED",
+              "C:" + r"\Users\REDACTED",
           ]
           allowed_dirs = {".git"}
           hits = []
