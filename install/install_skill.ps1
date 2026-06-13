@@ -18,9 +18,9 @@ if (Test-Path -LiteralPath $dest) {
   $backup = "$dest.backup.$stamp"
   Copy-Item -LiteralPath $dest -Destination $backup -Recurse -Force
   Write-Output "Backed up existing skill to $backup"
+  Remove-Item -LiteralPath $dest -Recurse -Force
 }
 
 Copy-Item -LiteralPath $source -Destination $destRoot -Recurse -Force
 Write-Output "Installed reaper-producer skill to $dest"
 Write-Output "Restart Codex or start a new thread before using the skill."
-

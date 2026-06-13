@@ -15,16 +15,20 @@ def default_bridge_dir() -> str:
     env_value = os.environ.get("REAPER_BRIDGE_DIR")
     if env_value:
         return env_value
-    candidates = [
-        r"REDACTED",
-        os.path.expandvars(r"%APPDATA%\REAPER\Scripts\mcp_bridge_data"),
-        os.path.expanduser(r"~/Library/Application Support/REAPER/Scripts/mcp_bridge_data"),
-        os.path.expanduser(r"~/.config/REAPER/Scripts/mcp_bridge_data"),
-    ]
+    candidates = []
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        candidates.append(str(Path(appdata) / "REAPER" / "Scripts" / "mcp_bridge_data"))
+    candidates.extend(
+        [
+            os.path.expanduser(r"~/Library/Application Support/REAPER/Scripts/mcp_bridge_data"),
+            os.path.expanduser(r"~/.config/REAPER/Scripts/mcp_bridge_data"),
+        ]
+    )
     for candidate in candidates:
         if candidate and Path(candidate).exists():
             return candidate
-    return candidates[1]
+    return candidates[0] if candidates else "mcp_bridge_data"
 
 
 def expand_path(value: str, variables: dict[str, str]) -> Path:
@@ -121,4 +125,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

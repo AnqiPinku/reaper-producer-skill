@@ -39,7 +39,15 @@ The skill assumes a `reaper` MCP server is available. With TwelveTake REAPER MCP
 
 ### Windows
 
-From this repository root:
+Clone the repository and run the installer:
+
+```powershell
+git clone https://github.com/AnqiPinku/reaper-producer-skill.git
+Set-Location -LiteralPath .\reaper-producer-skill
+.\install\install_skill.ps1
+```
+
+If you already cloned the repository, run this from the repository root:
 
 ```powershell
 .\install\install_skill.ps1
@@ -47,7 +55,15 @@ From this repository root:
 
 ### macOS / Linux
 
-From this repository root:
+Clone the repository and run the installer:
+
+```bash
+git clone https://github.com/AnqiPinku/reaper-producer-skill.git
+cd reaper-producer-skill
+bash install/install_skill.sh
+```
+
+If you already cloned the repository, run this from the repository root:
 
 ```bash
 bash install/install_skill.sh
@@ -84,7 +100,8 @@ python ~/.codex/skills/reaper-producer/scripts/check_reaper_mcp.py --bridge-dir 
 On Windows PowerShell, for example:
 
 ```powershell
-python -X utf8 "$env:USERPROFILE\.codex\skills\reaper-producer\scripts\check_reaper_mcp.py" --bridge-dir "REDACTED"
+$env:REAPER_BRIDGE_DIR = "C:\path\to\mcp_bridge_data"
+python -X utf8 "$env:USERPROFILE\.codex\skills\reaper-producer\scripts\check_reaper_mcp.py"
 ```
 
 ## Instrument Loading
@@ -162,4 +179,3 @@ install/
 ## License
 
 MIT. This repository contains workflow instructions and helper scripts only. It does not include third-party instrument content.
-
