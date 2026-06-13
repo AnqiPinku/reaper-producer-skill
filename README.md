@@ -1,5 +1,7 @@
 # REAPER Producer Skill
 
+[![CI](https://github.com/AnqiPinku/reaper-producer-skill/actions/workflows/ci.yml/badge.svg)](https://github.com/AnqiPinku/reaper-producer-skill/actions/workflows/ci.yml)
+
 A Codex skill for using REAPER through MCP as a cautious music-production assistant.
 
 This repository does not train a music model and does not replace REAPER. It gives Codex a practical workflow for controlling an already configured REAPER MCP server: inspect the project, plan safe edits, call REAPER tools, verify results, and keep destructive operations behind confirmation.

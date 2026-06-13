@@ -1,0 +1,139 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: Validate skill package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate skill structure
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          import sys
+
+          root = Path("skills/reaper-producer")
+          required_files = [
+              root / "SKILL.md",
+              root / "agents/openai.yaml",
+              root / "references/evals.md",
+              root / "references/instrument-loading.md",
+              root / "references/production-semantics.md",
+              root / "references/tool-map.md",
+              root / "scripts/check_reaper_mcp.py",
+              root / "scripts/insert_instrument_template.py",
+              root / "scripts/scan_reaper_templates.py",
+              root / "scripts/validate_instrument_registry.py",
+              Path("examples/instruments.example.json"),
+              Path("schemas/instrument-registry.schema.json"),
+          ]
+          missing = [str(path) for path in required_files if not path.is_file()]
+          if missing:
+              print("Missing required files:")
+              for path in missing:
+                  print(f"  - {path}")
+              sys.exit(1)
+
+          text = (root / "SKILL.md").read_text(encoding="utf-8")
+          if not text.startswith("---\n"):
+              print("SKILL.md must start with YAML frontmatter.")
+              sys.exit(1)
+          end = text.find("\n---\n", 4)
+          if end == -1:
+              print("SKILL.md frontmatter is not closed.")
+              sys.exit(1)
+
+          frontmatter = text[4:end].strip().splitlines()
+          fields = {}
+          for line in frontmatter:
+              if ":" in line and not line.startswith((" ", "\t")):
+                  key, value = line.split(":", 1)
+                  fields[key.strip()] = value.strip().strip('"').strip("'")
+
+          if fields.get("name") != "reaper-producer":
+              print("SKILL.md frontmatter name must be reaper-producer.")
+              sys.exit(1)
+          description = fields.get("description", "")
+          if len(description) < 80:
+              print("SKILL.md description is too short for reliable triggering.")
+              sys.exit(1)
+          if not re.fullmatch(r"[a-z0-9-]{1,64}", fields["name"]):
+              print("Skill name must use lowercase letters, digits, and hyphens.")
+              sys.exit(1)
+          body = text[end + 5 :].strip()
+          if not body:
+              print("SKILL.md body must not be empty.")
+              sys.exit(1)
+
+          openai_yaml = (root / "agents/openai.yaml").read_text(encoding="utf-8")
+          for key in ("display_name:", "short_description:", "default_prompt:"):
+              if key not in openai_yaml:
+                  print(f"agents/openai.yaml is missing {key}")
+                  sys.exit(1)
+
+          print("Skill structure is valid.")
+          PY
+
+      - name: Compile Python helper scripts
+        run: python -m compileall skills/reaper-producer/scripts
+
+      - name: Validate example instrument registry
+        run: python skills/reaper-producer/scripts/validate_instrument_registry.py examples/instruments.example.json
+
+      - name: Scan for local paths and secret markers
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import sys
+
+          forbidden = [
+              "g" + "hp_",
+              "github" + "_pat_",
+              "GITHUB_PERSONAL" + "_ACCESS_TOKEN",
+              "A:" + r"\REDACTED",
+              "A:" + r"\REDACTED",
+              "REDACTED" + " Library 2",
+              "A:" + r"\REDACTED",
+          ]
+          allowed_dirs = {".git"}
+          hits = []
+
+          for path in Path(".").rglob("*"):
+              if not path.is_file():
+                  continue
+              if any(part in allowed_dirs for part in path.parts):
+                  continue
+              try:
+                  text = path.read_text(encoding="utf-8")
+              except UnicodeDecodeError:
+                  continue
+              for marker in forbidden:
+                  if marker in text:
+                      hits.append((str(path), marker))
+
+          if hits:
+              print("Forbidden local path or secret marker found:")
+              for path, marker in hits:
+                  print(f"  - {path}: {marker}")
+              sys.exit(1)
+
+          print("No forbidden local paths or secret markers found.")
+          PY
