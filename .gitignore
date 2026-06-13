@@ -1,0 +1,24 @@
+.DS_Store
+Thumbs.db
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+dist/
+build/
+*.egg-info/
+
+# User-local configuration and generated registries
+instruments.json
+*.local.json
+*.generated.json
+
+# REAPER/audio project artifacts
+*.RPP
+*.RPP-bak
+*.wav
+*.mp3
+*.flac
+*.aif
+*.aiff
+

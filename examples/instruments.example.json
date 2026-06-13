@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "templates_root": "${REAPER_RESOURCE_PATH}/TrackTemplates",
+  "instruments": [
+    {
+      "id": "grand_piano",
+      "display_name": "Grand Piano",
+      "aliases": ["piano", "grand", "acoustic piano", "钢琴"],
+      "family": "keys",
+      "roles": ["chords", "melody", "sketch"],
+      "plugin": "Kontakt",
+      "library": "User local library",
+      "template_path": "${REAPER_RESOURCE_PATH}/TrackTemplates/Kontakt/Grand Piano.RTrackTemplate",
+      "default_track_name": "Piano",
+      "default_volume_db": -10,
+      "default_pan": 0,
+      "midi_channel": 1,
+      "tags": ["template", "editable-midi"]
+    },
+    {
+      "id": "strings_ensemble",
+      "display_name": "Strings Ensemble",
+      "aliases": ["strings", "string ensemble", "弦乐"],
+      "family": "strings",
+      "roles": ["chords", "pad", "arrangement"],
+      "plugin": "Any VSTi",
+      "library": "User local library",
+      "template_path": "${REAPER_RESOURCE_PATH}/TrackTemplates/Orchestral/Strings Ensemble.RTrackTemplate",
+      "default_track_name": "Strings",
+      "default_volume_db": -12,
+      "default_pan": 0,
+      "midi_channel": 1,
+      "tags": ["template", "orchestral", "editable-midi"]
+    }
+  ]
+}
+

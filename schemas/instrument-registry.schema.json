@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/reaper-producer/instrument-registry.schema.json",
+  "title": "REAPER Producer Instrument Registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "instruments"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    },
+    "templates_root": {
+      "type": "string"
+    },
+    "instruments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "display_name", "template_path"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_\\-]*$"
+          },
+          "display_name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "aliases": {
+            "type": "array",
+            "items": { "type": "string" },
+            "uniqueItems": true
+          },
+          "family": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": { "type": "string" },
+            "uniqueItems": true
+          },
+          "plugin": {
+            "type": "string"
+          },
+          "library": {
+            "type": "string"
+          },
+          "template_path": {
+            "type": "string",
+            "pattern": "\\.RTrackTemplate$"
+          },
+          "default_track_name": {
+            "type": "string"
+          },
+          "default_volume_db": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 24
+          },
+          "default_pan": {
+            "type": "number",
+            "minimum": -1,
+            "maximum": 1
+          },
+          "midi_channel": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16
+          },
+          "tags": {
+            "type": "array",
+            "items": { "type": "string" },
+            "uniqueItems": true
+          }
+        }
+      }
+    }
+  }
+}
+
