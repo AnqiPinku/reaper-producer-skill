@@ -184,6 +184,10 @@ schemas/
 install/
 ```
 
+## Credits
+
+Designed to work with [REAPER MCP v2](https://github.com/AnqiPinku/reaper-mcp-v2), whose bridge design derives from [TwelveTake-Studios/reaper-mcp](https://github.com/TwelveTake-Studios/reaper-mcp) (MIT). REAPER is a trademark of Cockos Incorporated; this is an independent, unofficial project, not affiliated with or endorsed by Cockos Incorporated or TwelveTake Studios.
+
 ## License
 
 MIT. This repository contains workflow instructions and helper scripts only. It does not include third-party instrument content.
