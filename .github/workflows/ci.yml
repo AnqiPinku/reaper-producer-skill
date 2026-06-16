@@ -101,41 +101,99 @@ jobs:
         shell: bash
         run: |
           python - <<'PY'
+          """CI guard: fail if any real local filesystem path or secret marker
+          leaked into the repository.
+
+          It detects *patterns* (drive-letter paths, Unix home paths, token
+          prefixes) rather than hard-coding anyone's private paths, so the guard
+          itself never has to spell out what it is hiding. Generic documentation
+          placeholders (``C:\\path\\to\\...``, ``C:\\Users\\<user>\\...``) are
+          explicitly allowed -- listing those reveals nothing private.
+          """
           from pathlib import Path
+          import re
           import sys
 
-          forbidden = [
-              "g" + "hp_",
-              "github" + "_pat_",
-              "GITHUB_PERSONAL" + "_ACCESS_TOKEN",
-              "A:" + r"\REDACTED",
-              "A:" + r"\REDACTED",
-              "REDACTED" + " Library 2",
-              "A:" + r"\REDACTED",
-              "REDACTED",
-              "C:" + r"\Users\REDACTED",
+          # Patterns that indicate a real local path or a leaked secret.
+          PATTERNS = [
+              # Windows absolute path: drive letter + ":\" + something.
+              # - (?<![A-Za-z0-9]) so we don't match "dir:\n" / "foo:\bar" inside words.
+              # - the tail allows backslashes and "<...>" so JSON-escaped "C:\\a\\b" and
+              #   "<user>" placeholders are captured whole and can be matched against the
+              #   allow-list; it stops at quotes / whitespace. Real paths never contain
+              #   "<>", so a genuine leak still fails the allow-list check below.
+              (re.compile(r"(?<![A-Za-z0-9])[A-Za-z]:\\[^\s\"']*"), "windows-path"),
+              # Unix home directories with a concrete user name.
+              (re.compile(r"/(?:Users|home)/[^\s\"'<>/]+"), "unix-home"),
+              # GitHub token / PAT markers.
+              (re.compile(r"gh[pousr]_[A-Za-z0-9]"), "github-token"),
+              (re.compile(r"github_pat_"), "github-pat"),
+              (re.compile(r"GITHUB_PERSONAL_ACCESS_TOKEN"), "github-token-env"),
           ]
-          allowed_dirs = {".git"}
-          hits = []
 
-          for path in Path(".").rglob("*"):
-              if not path.is_file():
-                  continue
-              if any(part in allowed_dirs for part in path.parts):
-                  continue
-              try:
-                  text = path.read_text(encoding="utf-8")
-              except UnicodeDecodeError:
-                  continue
-              for marker in forbidden:
-                  if marker in text:
-                      hits.append((str(path), marker))
+          # Known-legitimate documentation placeholders (generic, non-private).
+          # A path match is ignored when, after normalising "\\" -> "\" and
+          # lower-casing, it equals one of these or sits directly beneath it.
+          ALLOWED_PATHS = (
+              r"c:\path\to",
+              r"c:\mcp\reaper-mcp-v2",
+              r"c:\users\you",
+              r"c:\users\me",
+              r"c:\users\<user>",
+              r"c:\users\<username>",
+              r"c:\users\<your-user>",
+              r"/users/<user>",
+              r"/users/you",
+              r"/users/me",
+              r"/home/<user>",
+              r"/home/you",
+              r"/home/me",
+          )
 
-          if hits:
-              print("Forbidden local path or secret marker found:")
-              for path, marker in hits:
-                  print(f"  - {path}: {marker}")
-              sys.exit(1)
+          SKIP_DIR_PARTS = {".git", "__pycache__", ".pytest_cache", ".venv", "venv", "env"}
 
-          print("No forbidden local paths or secret markers found.")
+
+          def normalise(match: str) -> str:
+              return match.replace("\\\\", "\\").rstrip("\\").lower()
+
+
+          def is_allowed(match: str) -> bool:
+              norm = normalise(match)
+              for allowed in ALLOWED_PATHS:
+                  if norm == allowed or norm.startswith(allowed + "\\") or norm.startswith(allowed + "/"):
+                      return True
+              return False
+
+
+          def main() -> int:
+              hits = []
+              for path in sorted(Path(".").rglob("*")):
+                  if not path.is_file():
+                      continue
+                  if any(part in SKIP_DIR_PARTS for part in path.parts):
+                      continue
+                  # Don't scan this guard (its own patterns/allow-list aren't paths).
+                  if path.name == "ci.yml":
+                      continue
+                  try:
+                      text = path.read_text(encoding="utf-8")
+                  except (UnicodeDecodeError, OSError):
+                      continue
+                  for pattern, label in PATTERNS:
+                      for m in pattern.findall(text):
+                          if label in ("windows-path", "unix-home") and is_allowed(m):
+                              continue
+                          hits.append((str(path), label, m))
+
+              if hits:
+                  print("Forbidden local paths or secret markers found:")
+                  for path, label, m in hits:
+                      print(f"  {path}: [{label}] {m}")
+                  return 1
+              print("No forbidden local paths or secret markers found.")
+              return 0
+
+
+          if __name__ == "__main__":
+              sys.exit(main())
           PY
