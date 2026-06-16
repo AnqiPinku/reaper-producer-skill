@@ -36,6 +36,14 @@ The skill assumes a `reaper` MCP server is available. With [REAPER MCP v2](https
 3. Use an ASCII path for the MCP server command/cwd on Windows when possible.
 4. Keep the default IPC mailbox at `%APPDATA%\reaper-mcp-ipc`, or set `REAPER_MCP_IPC_DIR` on both sides.
 
+## 🤖 Install with your coding agent
+
+Tell your agent (Codex, Claude Code, …):
+
+> Install the REAPER Producer skill from https://github.com/AnqiPinku/reaper-producer-skill — read AGENTS.md and follow it.
+
+It will clone the repo and run the installer. Note this skill needs the [REAPER MCP v2](https://github.com/AnqiPinku/reaper-mcp-v2) server installed first. See [AGENTS.md](AGENTS.md), or follow the manual steps below.
+
 ## Install
 
 ### Windows
